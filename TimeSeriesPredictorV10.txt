@@ -1,0 +1,1721 @@
+package adapt;
+
+import java.math.BigInteger;
+import java.util.Arrays;
+import java.util.Random;
+
+public class TimeSeriesPredictorV10 {
+
+	public static void main(String[] args) throws Exception {
+		
+		if (args.length == 0) {
+			args = new String [] {"1"};
+		}
+
+		double pThreshold = 0.05;
+		IO.p(TimeSeriesPredictorV4.class.getName());
+
+		int numTrialsForRandomizedDataBaselineDetermination = Integer.parseInt(args[0]);
+
+		String experimentNames[] = { //
+		//
+				"PollenInfluxAnnual-PNSL", //
+				"PollenInfluxAnnual-BCI", //
+				"PollenInfluxAnnual-PNSL+BCI", //
+				"PollenInfluxSeasonal-PNSL", //
+				"PollenInfluxSeasonal-BCI", //
+				"PollenInfluxSeasonal-PNSL+BCI", //
+				"PollenPercentAnnual-PNSL", //
+				"PollenPercentAnnual-BCI", //
+				"PollenPercentAnnual-PNSL+BCI", //
+				"PollenPercentSeasonal-PNSL", //
+				"PollenPercentSeasonal-BCI", //
+				"PollenPercentSeasonal-PNSL+BCI", //
+				"FlowersAnnualShort-BCI", //
+				"SeedsAnnualShort-BCI", //
+				"FlowersAnnualLong-BCI", //
+				"SeedsAnnualLong-BCI" };
+
+		int[] classRowIndices = { 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 0, 0, 0, 0 };
+		String dataSubsetFilter0[] = { //
+		//
+				null, //
+				null, //
+				null, //
+				null, //
+				null, //
+				null, //
+				null, //
+				null, //
+				null, //
+				null, //
+				null, //
+				null, //
+				null, //
+				null, //
+				null, //
+				null };
+
+		String dataSubsetFilter1[] = { //
+		//
+				"Tree", //
+				"Tree", //
+				"Tree", //
+				"Tree", //
+				"Tree", //
+				"Tree", //
+				"Tree", //
+				"Tree", //
+				"Tree", //
+				"Tree", //
+				"Tree", //
+				"Tree", //
+				"TREE", //
+				"TREE", //
+				"TREE", //
+				"TREE" };
+
+		String dataSubsetFilter2[] = { //
+		//
+				"Liana", //
+				"Liana", //
+				"Liana", //
+				"Liana", //
+				"Liana", //
+				"Liana", //
+				"Liana", //
+				"Liana", //
+				"Liana", //
+				"Liana", //
+				"Liana", //
+				"Liana", //
+				"LIANA", //
+				"LIANA", //
+				"LIANA", //
+				"LIANA" };
+
+ String[][] filters = new String[][] { dataSubsetFilter0, dataSubsetFilter1, dataSubsetFilter2 };
+//		String[][] filters = new String[][] { dataSubsetFilter0 };
+
+		int numFilters = filters.length;
+		int numExperiments = experimentNames.length;
+
+// int focusProblemNumber = 1;
+// int focusProblemNumber = 3;
+// int focusProblemNumber = 5;
+// int focusProblemNumber = 7;
+// int focusProblemNumber = 9;
+// int focusProblemNumber = 11;
+// int focusProblemNumber = 13;
+// int focusProblemNumber = 15;
+// int numToSolve = 2;
+
+		int focusProblemNumber = 1;
+		int numToSolve = 16;
+
+		int startExperimentIndex = focusProblemNumber - 1;
+		int endExperimentIndex = focusProblemNumber - 1 + (numToSolve - 1);
+
+// int startExperimentIndex = 0;
+// int endExperimentIndex = numExperiments - 1;
+
+		int maxModelLag = 2;
+
+		// sampling is used to estimate best model probabilities (this can be improved later using an exact approach)
+		int numBestModelEvaluationTrials = 2000;
+
+		boolean reportObservationTimesAndRowIndex = false;
+
+		boolean reportTaxaResponseToDriverVariables = false;
+
+		int numInputFeatures = 4;
+
+		boolean filterZeroOutputProblems = true;
+		double minValueSum = 0.0;
+
+		Random ditherRandom = new Random();
+		double ditherRange = 1.0e-100;
+
+		// inductive biases //
+
+		int numErrortypes = 2;
+		String[] errorTypeStrings = new String[] { "|Diff|", "Diff^2" };
+
+		// problem space specification //
+
+		int[] numProblemsSpaces = new int[] { 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, };
+		// int numProblemsSpaces = 3;
+		String[][] siteNames = new String[][] { //
+		//
+				{ "PNSL" }, //
+				{ "BCI" }, //
+				{ "PNSL+BCI" }, //
+
+				{ "PNSL" }, //
+				{ "BCI" }, //
+				{ "PNSL+BCI" }, //
+
+				{ "PNSL" }, //
+				{ "BCI" }, //
+				{ "PNSL+BCI" }, //
+
+				{ "PNSL" }, //
+				{ "BCI" }, //
+				{ "PNSL+BCI" }, //
+
+				{ "BCI" }, //
+				{ "BCI" }, //
+				{ "BCI" }, //
+				{ "BCI" }, };
+
+// int[] numProblemsInSpace = new int[] { 189, 189, 188, 189, 81, 81, 81, 81, };
+		int[] numOutputsToPredict = new int[] { 179, 179, 179, 179, 179, 179, 179, 179, 179, 179, 179, 179, 81, 81, 81, 81, };
+
+		String dataDirectory = "/data/tsl/";
+		String[] dataFileNames = new String[] { //
+		//
+				"annualinfluxV4.csv", //
+				"annualinfluxV4.csv", //
+				"annualinfluxV4.csv", //
+				"seasonalinfluxV4.csv", //
+				"seasonalinfluxV4.csv", //
+				"seasonalinfluxV4.csv", //
+				"annualpercentagesV4.csv", //
+				"annualpercentagesV4.csv", //
+				"annualpercentagesV4.csv", //
+				"seasonalpercentagesV4.csv", //
+				"seasonalpercentagesV4.csv", //
+				"seasonalpercentagesV4.csv", //
+				"flowers.csv", //
+				"seeds.csv", //
+				"flowers.csv", //
+				"seeds.csv" };
+
+		int[][] problemSpaceTotalTimeSeriesLength = new int[][] { //
+		//
+				{ 8 }, //
+				{ 9 }, //
+				{ 8 }, //
+
+				{ 17 }, //
+				{ 14 }, //
+				{ 14 }, //
+
+				{ 8 }, //
+				{ 9 }, //
+				{ 8 }, //
+
+				{ 17 }, //
+				{ 14 }, //
+				{ 14 }, //
+
+				{ 12 }, //
+				{ 12 }, //
+				{ 15 }, //
+				{ 15 } };
+
+		int[][] problemSpaceTimeSeriesStartRowIndex = new int[][] { //
+		//
+				{ 4 }, //
+				{ 14 }, //
+				{ -1 }, //
+
+				{ 4 }, //
+				{ 28 }, //
+				{ -1 }, //
+
+				{ 4 }, //
+				{ 14 }, //
+				{ -1 }, //
+
+				{ 4 }, //
+				{ 28 }, //
+				{ -1 }, //
+
+				{ 6 }, //
+				{ 6 }, //
+				{ 3 }, //
+				{ 3 } };
+
+		int[][][] problemSpaceMergedTimeSeriesStartRowIndices = new int[][][] { //
+		//
+				{ {}, }, //
+				{ {}, }, //
+				{ { 4, 15 } }, //
+
+				{ {}, }, //
+				{ {}, }, //
+				{ { 7, 28 } }, //
+
+				{ {}, }, //
+				{ {}, }, //
+				{ { 4, 15 } }, //
+
+				{ {}, }, //
+				{ {}, }, //
+				{ { 7, 28 } }, //
+
+				{ {} }, //
+				{ {} }, //
+				{ {} }, //
+				{ {} } };
+
+		boolean[][] mergedProblems = new boolean[][] { //
+		//
+				{ false }, //
+				{ false }, //
+				{ true }, //
+
+				{ false }, //
+				{ false }, //
+				{ true }, //
+
+				{ false }, //
+				{ false }, //
+				{ true }, //
+
+				{ false }, //
+				{ false }, //
+				{ true }, //
+
+				{ false }, //
+				{ false }, //
+				{ false }, //
+				{ false } };
+
+		int inputFeatureStartColumnIndex = 3;
+		int[] outputFeatureStartColumnIndex = new int[] { //
+		//
+				8, //
+				8, //
+				8, //
+				8, //
+				8, //
+				8, //
+				7, //
+				7, //
+				7, //
+				7, //
+				7, //
+				7, //
+				7, //
+				7, //
+				7, //
+				7 };
+
+		// model space specification //
+
+		int[] numModels = new int[] { //
+		//
+				11, //
+				11, //
+				11, //
+				11, //
+				11, //
+				11, //
+				11, //
+				11, //
+				11, //
+				11, //
+				11, //
+				11, //
+				11, //
+				11, //
+				8, //
+				8, };
+
+		boolean[] modelUseSelfModelShortSeries = new boolean[] {//
+		//
+				false, //
+// true, //
+// true, //
+				false, //
+				false, //
+				false, //
+				false, //
+				false, //
+				false, //
+				false, //
+				false, //
+				false, //
+				false //
+		};
+
+		boolean[] modelUseMeanModelShortSeries = new boolean[] { //
+		//
+				true, //
+// false, //
+// false, //
+				false, //
+				false, //
+				false, //
+				false, //
+				false, //
+				false, //
+				false, //
+				false, //
+				false, //
+				false //
+		};
+
+		int[] modelInputFeatureIndicesShortSeries = new int[] { //
+		//
+				-1, //
+// -1, //
+// -1, //
+				0, //
+				1, //
+				2, //
+				3, //
+				1, //
+				2, //
+				3, //
+				1, //
+				2, //
+				3 //
+		};
+
+		String[] modelInputFeatureNamesShortSeries = new String[] {//
+		//
+				"None-NoLag", //
+// "Self-Lag1", //
+// "Self-Lag2", //
+				"Time-NoLag", //
+				"Sun-NoLag", //
+				"Precip-NoLag", //
+				"Temp-NoLag", //
+				"Sun-Lag1", //
+				"Precip-Lag1", //
+				"Temp-Lag1", //
+				"Sun-Lag2", //
+				"Precip-Lag2", //
+				"Temp-Lag2" //
+		};
+
+		int[] modelLagsShortSeries = new int[] { //
+		//
+				0, //
+// 1, //
+// 2, //
+				0, //
+				0, //
+				0, //
+				0, //
+				1, //
+				1, //
+				1, //
+				2, //
+				2, //
+				2 //
+		};
+		double[] slopeOffsetsShortSeries = new double[] { //
+		//
+				0.0, //
+// -1.0, //
+// -1.0, //
+// 0.0, // for random inputs
+// 0.0, // for random inputs
+				0.0, //
+				0.0, //
+				0.0, //
+				0.0, //
+				0.0, //
+				0.0, //
+				0.0, //
+				0.0, //
+				0.0, //
+				0.0, //
+		};
+
+		boolean[] modelUseSelfModelLongSeries = new boolean[] { //
+		//
+				false, //
+// true, //
+// true, //
+				false, //
+				false, //
+				false, //
+				false, //
+				false, //
+				false, //
+				false //
+		};
+
+		boolean[] modelUseMeanModelLongSeries = new boolean[] { //
+		//
+				true, //
+// false, //
+// false, //
+				false, //
+				false, //
+				false, //
+				false, //
+				false, //
+				false, //
+				false //
+		};
+
+		int[] modelInputFeatureIndicesLongSeries = new int[] { //
+		//
+				-1, //
+// -1, //
+// -1, //
+				0, //
+				2, //
+				3, //
+				2, //
+				3, //
+				2, //
+				3 //
+		};
+
+		String[] modelInputFeatureNamesLongSeries = new String[] { //
+		//
+				"None-NoLag", //
+// "Self-Lag1", //
+// "Self-Lag2", //
+				"Time-NoLag", //
+				"Precip-NoLag", //
+				"Temp-NoLag", //
+				"Precip-Lag1", //
+				"Temp-Lag1", //
+				"Precip-Lag2", //
+				"Temp-Lag2" //
+		};
+
+		int[] modelLagsLongSeries = new int[] { //
+		//
+				0, //
+// 1, //
+// 2, //
+				0, //
+				0, //
+				0, //
+				1, //
+				1, //
+				2, //
+				2 //
+		};
+
+		double[] slopeOffsetsLongSeries = new double[] { //
+		//
+				0.0, //
+				// -1.0, //
+				// -1.0, //
+// 0.0, // for random inputs
+// 0.0, // for random inputs
+				0.0, //
+				0.0, //
+				0.0, //
+				0.0, //
+				0.0, //
+				0.0, //
+				0.0, //
+				0.0, //
+				0.0, //
+				0.0, //
+		};
+
+		boolean[][] modelUseSelfModel = new boolean[][] { //
+		//
+				modelUseSelfModelShortSeries, //
+				modelUseSelfModelShortSeries, //
+				modelUseSelfModelShortSeries, //
+				modelUseSelfModelShortSeries, //
+				modelUseSelfModelShortSeries, //
+				modelUseSelfModelShortSeries, //
+				modelUseSelfModelShortSeries, //
+				modelUseSelfModelShortSeries, //
+				modelUseSelfModelShortSeries, //
+				modelUseSelfModelShortSeries, //
+				modelUseSelfModelShortSeries, //
+				modelUseSelfModelShortSeries, //
+				modelUseSelfModelShortSeries, //
+				modelUseSelfModelShortSeries, //
+				modelUseSelfModelLongSeries, //
+				modelUseSelfModelLongSeries //
+		};
+
+		boolean[][] modelUseMeanModel = new boolean[][] { //
+		//
+				modelUseMeanModelShortSeries, //
+				modelUseMeanModelShortSeries, //
+				modelUseMeanModelShortSeries, //
+				modelUseMeanModelShortSeries, //
+				modelUseMeanModelShortSeries, //
+				modelUseMeanModelShortSeries, //
+				modelUseMeanModelShortSeries, //
+				modelUseMeanModelShortSeries, //
+				modelUseMeanModelShortSeries, //
+				modelUseMeanModelShortSeries, //
+				modelUseMeanModelShortSeries, //
+				modelUseMeanModelShortSeries, //
+				modelUseMeanModelShortSeries, //
+				modelUseMeanModelShortSeries, //
+				modelUseMeanModelLongSeries, //
+				modelUseMeanModelLongSeries //
+		};
+
+		int[][] modelInputFeatureIndices = new int[][] { //
+		//
+				modelInputFeatureIndicesShortSeries, //
+				modelInputFeatureIndicesShortSeries, //
+				modelInputFeatureIndicesShortSeries, //
+				modelInputFeatureIndicesShortSeries, //
+				modelInputFeatureIndicesShortSeries, //
+				modelInputFeatureIndicesShortSeries, //
+				modelInputFeatureIndicesShortSeries, //
+				modelInputFeatureIndicesShortSeries, //
+				modelInputFeatureIndicesShortSeries, //
+				modelInputFeatureIndicesShortSeries, //
+				modelInputFeatureIndicesShortSeries, //
+				modelInputFeatureIndicesShortSeries, //
+				modelInputFeatureIndicesShortSeries, //
+				modelInputFeatureIndicesShortSeries, //
+				modelInputFeatureIndicesLongSeries, //
+				modelInputFeatureIndicesLongSeries //
+		};
+		String[][] modelInputFeatureNames = new String[][] { //
+		//
+				modelInputFeatureNamesShortSeries, //
+				modelInputFeatureNamesShortSeries, //
+				modelInputFeatureNamesShortSeries, //
+				modelInputFeatureNamesShortSeries, //
+				modelInputFeatureNamesShortSeries, //
+				modelInputFeatureNamesShortSeries, //
+				modelInputFeatureNamesShortSeries, //
+				modelInputFeatureNamesShortSeries, //
+				modelInputFeatureNamesShortSeries, //
+				modelInputFeatureNamesShortSeries, //
+				modelInputFeatureNamesShortSeries, //
+				modelInputFeatureNamesShortSeries, //
+				modelInputFeatureNamesShortSeries, //
+				modelInputFeatureNamesShortSeries, //
+				modelInputFeatureNamesLongSeries, //
+				modelInputFeatureNamesLongSeries //
+		};
+		int[][] modelLags = new int[][] { //
+		//
+				modelLagsShortSeries, //
+				modelLagsShortSeries, //
+				modelLagsShortSeries, //
+				modelLagsShortSeries, //
+				modelLagsShortSeries, //
+				modelLagsShortSeries, //
+				modelLagsShortSeries, //
+				modelLagsShortSeries, //
+				modelLagsShortSeries, //
+				modelLagsShortSeries, //
+				modelLagsShortSeries, //
+				modelLagsShortSeries, //
+				modelLagsShortSeries, //
+				modelLagsShortSeries, //
+				modelLagsLongSeries, //
+				modelLagsLongSeries //
+		};
+
+		double[][] modelSlopeOffsets = new double[][] { //
+		//
+				slopeOffsetsShortSeries, //
+				slopeOffsetsShortSeries, //
+				slopeOffsetsShortSeries, //
+				slopeOffsetsShortSeries, //
+				slopeOffsetsShortSeries, //
+				slopeOffsetsShortSeries, //
+				slopeOffsetsShortSeries, //
+				slopeOffsetsShortSeries, //
+				slopeOffsetsShortSeries, //
+				slopeOffsetsShortSeries, //
+				slopeOffsetsShortSeries, //
+				slopeOffsetsShortSeries, //
+				slopeOffsetsShortSeries, //
+				slopeOffsetsShortSeries, //
+				slopeOffsetsLongSeries, //
+				slopeOffsetsLongSeries //
+		};
+
+		/*********************************/
+		/*********************************/
+		/**                             **/
+		/** CREATE TIME SERIES EXAMPLES **/
+		/**                             **/
+		/*********************************/
+		/*********************************/
+
+		int numDataTypes = 2;
+		String[] dataTypeName = new String[] { "annual", "seasonal" };
+
+		String[] phaseNames = new String[] { "RandomizedDataBaselineDetermination", "RealDataModelEvaluation" };
+		int numPhases = phaseNames.length;
+
+		/*************************/
+		/** FOR EACH EXPERIMENT **/
+		/*************************/
+
+		// #################################################################################################################################################################################
+
+		for (int experimentIndex = startExperimentIndex; experimentIndex <= endExperimentIndex; experimentIndex++) {
+
+			// #################################################################################################################################################################################
+
+			for (int filterIndex = 0; filterIndex < numFilters; filterIndex++) {
+
+				// #################################################################################################################################################################################
+
+				String[] dataSubsetFilter = filters[filterIndex];
+
+				int maxNumScores = (int) 1e6;
+				double[] zScores = new double[maxNumScores];
+				int numZScores = 0;
+				double[] pScores = new double[maxNumScores];
+				int numPScores = 0;
+
+				for (int phaseIndex = 0; phaseIndex < numPhases; phaseIndex++) {
+
+					IO.p();
+					IO.p("Phase = " + phaseNames[phaseIndex]);
+					IO.p();
+
+					boolean randomizedDataBaselineDeterminationMode = false;
+					boolean realDataModelEvaluationMode = false;
+
+					switch (phaseIndex) {
+					case 0:
+						randomizedDataBaselineDeterminationMode = true;
+						break;
+					case 1:
+						realDataModelEvaluationMode = true;
+						break;
+					}
+
+					int numTrials = 1;
+
+					boolean randomInputs = false;
+					boolean randomOutputs = false;
+					boolean shuffleInputsIndependent = false;
+					boolean shuffleOutputsIndependent = false;
+					boolean shuffleInputsDependent = false;
+
+					boolean enableCrossValidationAnalysis = true;
+
+					if (randomizedDataBaselineDeterminationMode) {
+						numTrials = numTrialsForRandomizedDataBaselineDetermination;
+						randomInputs = false; // true false
+						randomOutputs = false; // true false
+						shuffleInputsIndependent = false; // true false
+						shuffleOutputsIndependent = false; // true false
+						shuffleInputsDependent = true; // true false
+
+						enableCrossValidationAnalysis = false;
+					}
+
+					Random randomInputsRandom = new Random();
+					Random randomOutputsRandom = new Random();
+
+					/****************************/
+					/** FOR EACH TYPE OF DATA **/
+					/****************************/
+
+					double numTails = 2.0;
+
+					int numModelsTested = 0;
+
+					// #################################################################################################################################################################################
+
+					for (int trialIndex = 0; trialIndex < numTrials; trialIndex++) {
+
+						if (!randomizedDataBaselineDeterminationMode) {
+							IO.p();
+							IO.p();
+							IO.p();
+							IO.p();
+							IO.p();
+							IO.p();
+							IO.p();
+							IO.p();
+							IO.p("Experiment = " + experimentNames[experimentIndex]);
+							IO.p();
+						}
+
+						int taxaCategoryDataRowIndex = classRowIndices[experimentIndex];
+						SimpleTable table = IO.readDelimitedTable(dataDirectory + dataFileNames[experimentIndex]);
+						// IO.p("table.numDataRows = " + table.numDataRows);
+						// IO.p("table.numDataColumns = " + table.numDataColumns);
+
+						String[] problemNames = new String[numOutputsToPredict[experimentIndex]];
+
+						String[] problemClassNames = new String[numOutputsToPredict[experimentIndex]];
+
+						for (int i = 0; i < numOutputsToPredict[experimentIndex]; i++) {
+							problemNames[i] = table.columnNames[outputFeatureStartColumnIndex[experimentIndex] + i];
+							problemClassNames[i] = table.getString(taxaCategoryDataRowIndex, outputFeatureStartColumnIndex[experimentIndex] + i);
+// IO.p(problemNames[i]);
+						}
+
+						// read example table //
+
+						if (!randomizedDataBaselineDeterminationMode) {
+							if (reportObservationTimesAndRowIndex) {
+
+								IO.p();
+								IO.p();
+								IO.p();
+								IO.p("experimentName = " + experimentNames[experimentIndex]);
+								IO.p("dataFileName   = " + dataFileNames[experimentIndex]);
+								IO.p();
+								IO.p("RowIndex" + "\t" + "TimeString");
+
+								for (int i = 0; i < table.numDataRows; i++) {
+
+									IO.p(i + "\t" + table.getString(i, 0));
+
+								}
+							}
+						}
+
+						/********************************************/
+						/** FOR EACH INDEPENDENT SPACE OF PROBLEMS **/
+						/********************************************/
+
+						// #################################################################################################################################################################################
+
+						for (int siteIndex = 0; siteIndex < numProblemsSpaces[experimentIndex]; siteIndex++) {
+
+							if (!randomizedDataBaselineDeterminationMode) {
+								IO.p();
+								IO.p();
+								IO.p();
+								IO.p();
+								IO.p("Problem = " + siteNames[experimentIndex][siteIndex]);
+								IO.p();
+
+								IO.p();
+								IO.p();
+								IO.p("N-1 Cross Validation Predictive Accuracy Analysis");
+								IO.p();
+							}
+
+							/****************************/
+							/** FOR EACH TYPE OF ERROR **/
+							/****************************/
+
+							boolean merged = mergedProblems[experimentIndex][siteIndex];
+
+							int totalTimeSeriesLength = problemSpaceTotalTimeSeriesLength[experimentIndex][siteIndex];
+							int timeSeriesStartRowIndex = problemSpaceTimeSeriesStartRowIndex[experimentIndex][siteIndex];
+
+							int validDataStartRowIndex = timeSeriesStartRowIndex - maxModelLag;
+							int totalNumDataRows = totalTimeSeriesLength + maxModelLag;
+
+							int numAllExamples = totalTimeSeriesLength;
+
+							int numTrainingExamples = numAllExamples - 1;
+							int numTestingExamples = 1;
+
+							int timeSeriesMergedStartRowIndex1 = -1;
+							int timeSeriesMergedStartRowIndex2 = -1;
+							if (merged) {
+								timeSeriesMergedStartRowIndex1 = problemSpaceMergedTimeSeriesStartRowIndices[experimentIndex][siteIndex][0];
+								timeSeriesMergedStartRowIndex2 = problemSpaceMergedTimeSeriesStartRowIndices[experimentIndex][siteIndex][1];
+							}
+
+							// shuffle input data //
+
+							if (shuffleInputsDependent) {
+
+								for (int inputFeatureIndex = 0; inputFeatureIndex < numInputFeatures; inputFeatureIndex++) {
+
+									// create copy of input //
+
+									int[] randomIndices = Utility.randomIntArray(randomInputsRandom, totalNumDataRows);
+
+									if (!merged) {
+
+										String[] inputStringValueCopy = new String[totalNumDataRows];
+
+										for (int dataIndex = 0; dataIndex < totalNumDataRows; dataIndex++) {
+
+											inputStringValueCopy[dataIndex] = //
+											table.stringMatrix[timeSeriesStartRowIndex + dataIndex - maxModelLag][inputFeatureStartColumnIndex + inputFeatureIndex];
+
+										}
+										for (int dataIndex = 0; dataIndex < totalNumDataRows; dataIndex++) {
+
+											table.stringMatrix[timeSeriesStartRowIndex + dataIndex - maxModelLag][inputFeatureStartColumnIndex + inputFeatureIndex] = //
+											inputStringValueCopy[randomIndices[dataIndex]];
+
+										}
+
+									} else {
+
+										String[] inputStringValueCopy1 = new String[totalNumDataRows];
+										String[] inputStringValueCopy2 = new String[totalNumDataRows];
+
+										for (int dataIndex = 0; dataIndex < totalNumDataRows; dataIndex++) {
+
+											inputStringValueCopy1[dataIndex] = //
+											table.stringMatrix[timeSeriesMergedStartRowIndex1 + dataIndex - maxModelLag][inputFeatureStartColumnIndex + inputFeatureIndex];
+											inputStringValueCopy2[dataIndex] = //
+											table.stringMatrix[timeSeriesMergedStartRowIndex2 + dataIndex - maxModelLag][inputFeatureStartColumnIndex + inputFeatureIndex];
+
+										}
+										for (int dataIndex = 0; dataIndex < totalNumDataRows; dataIndex++) {
+
+											table.stringMatrix[timeSeriesMergedStartRowIndex1 + dataIndex - maxModelLag][inputFeatureStartColumnIndex + inputFeatureIndex] = //
+											inputStringValueCopy1[randomIndices[dataIndex]];
+
+											table.stringMatrix[timeSeriesMergedStartRowIndex2 + dataIndex - maxModelLag][inputFeatureStartColumnIndex + inputFeatureIndex] = //
+											inputStringValueCopy2[randomIndices[dataIndex]];
+
+										}
+
+									}
+								}
+							}
+
+							double[] exampleInputs = new double[numAllExamples];
+							double[] exampleOutputs = new double[numAllExamples];
+
+							double[][] crossValidationTrainExampleInputs = new double[numTrainingExamples][1];
+							double[] crossValidationTrainExampleOutputs = new double[numTrainingExamples];
+
+							double[][] crossValidationTestExampleInputs = new double[numTestingExamples][1];
+							double[] crossValidationTestExampleOutputs = new double[numTestingExamples];
+
+							for (int errorTypeIndex = 0; errorTypeIndex < numErrortypes; errorTypeIndex++) {
+
+								if (!randomizedDataBaselineDeterminationMode) {
+									IO.p();
+									IO.p("ErrorType = " + errorTypeStrings[errorTypeIndex]);
+									IO.p();
+
+								}
+
+								double[] prolemSpaceModelErrorRateSums = new double[numModels[experimentIndex]];
+								double[] prolemSpaceModelErrorRates = new double[numModels[experimentIndex]];
+
+								int[] bestModelIndexCounts = new int[numModels[experimentIndex]];
+
+								double[][] prolemSpaceModelSlopes = new double[numModels[experimentIndex]][numOutputsToPredict[experimentIndex]];
+								int[][] prolemSpaceModelSlopeSignCounts = new int[numModels[experimentIndex]][2]; // 0 - negative slope, 1 - positive slope
+
+								double[] prolemModelSlopeSignCounts = new double[2]; // 0 - negative slope, 1 - positive slope
+
+								int numPredictionProblemsSolved = 0;
+
+								/******************************************/
+								/** FOR EACH PREDICTION PROBLEM IN SPACE **/
+								/******************************************/
+
+								int[] predictedOutputIndices = new int[numOutputsToPredict[experimentIndex]];
+								int numPredictedOutputs = 0;
+
+								for (int outputFeatureIndex = 0; outputFeatureIndex < numOutputsToPredict[experimentIndex]; outputFeatureIndex++) {
+
+									String problemName = problemNames[outputFeatureIndex];
+
+									String taxaCategoryName = table.getString(taxaCategoryDataRowIndex, outputFeatureStartColumnIndex[experimentIndex] + outputFeatureIndex);
+
+// IO.p(taxaCategoryName);
+
+									if (dataSubsetFilter[experimentIndex] == null || taxaCategoryName.equals(dataSubsetFilter[experimentIndex])) {
+
+										// ignore problems with all zero counts
+										//
+
+										{
+											double responseTotalSum = 0.0;
+											boolean allZeroResponses = true;
+											boolean allZeroResponses1 = true;
+											boolean allZeroResponses2 = true;
+
+											if (merged) {
+
+												for (int exampleIndex = 0; exampleIndex < numAllExamples; exampleIndex++) {
+
+													double value;
+
+													value = table.getDouble(timeSeriesMergedStartRowIndex1 + exampleIndex, outputFeatureStartColumnIndex[experimentIndex] + outputFeatureIndex);
+
+													responseTotalSum += value;
+													if (value != 0.0)
+														allZeroResponses1 = false;
+												}
+
+												for (int exampleIndex = 0; exampleIndex < numAllExamples; exampleIndex++) {
+
+													double value = table.getDouble(timeSeriesMergedStartRowIndex2 + exampleIndex, outputFeatureStartColumnIndex[experimentIndex] + outputFeatureIndex);
+
+													responseTotalSum += value;
+													if (value != 0.0)
+														allZeroResponses2 = false;
+												}
+
+												// normalize by number of problems merged
+												responseTotalSum /= 2.0;
+
+												if (allZeroResponses1 == true || allZeroResponses2 == true) {
+													allZeroResponses = true;
+												} else {
+													allZeroResponses = false;
+												}
+
+											} else if (!merged) {
+
+												for (int exampleIndex = 0; exampleIndex < numAllExamples; exampleIndex++) {
+
+													double value = table.getDouble(timeSeriesStartRowIndex + exampleIndex, outputFeatureStartColumnIndex[experimentIndex] + outputFeatureIndex);
+
+													responseTotalSum += value;
+													if (value != 0.0)
+														allZeroResponses = false;
+												}
+
+											}
+
+											if (filterZeroOutputProblems && allZeroResponses)
+												continue;
+
+											if (responseTotalSum < minValueSum) {
+												continue;
+											}
+
+										}
+
+										predictedOutputIndices[numPredictedOutputs++] = outputFeatureIndex;
+
+										double[] modelErrorRates = new double[numModels[experimentIndex]];
+
+										/********************************/
+										/** FOR EACH MODELING STRATEGY **/
+										/********************************/
+
+										for (int modelIndex = 0; modelIndex < numModels[experimentIndex]; modelIndex++) {
+
+											boolean useSelfModel = modelUseSelfModel[experimentIndex][modelIndex];
+											boolean useMeanModel = modelUseMeanModel[experimentIndex][modelIndex];
+
+											int modelInputFeatureIndex = modelInputFeatureIndices[experimentIndex][modelIndex];
+											int lag = modelLags[experimentIndex][modelIndex];
+
+											/*********************************/
+											/** CREATE EXAMPLES FOR LEARNING */
+											/*********************************/
+
+											if (merged) {
+
+												// create training example inputs //
+
+												if (!useMeanModel) {
+													for (int exampleIndex = 0; exampleIndex < numAllExamples; exampleIndex++) {
+
+														int rowIndex1 = timeSeriesMergedStartRowIndex1 + exampleIndex - lag;
+														int rowIndex2 = timeSeriesMergedStartRowIndex2 + exampleIndex - lag;
+
+														if (randomInputs) {
+															exampleInputs[exampleIndex] = randomInputsRandom.nextGaussian();
+
+														} else if (useSelfModel) {
+															exampleInputs[exampleIndex] = //
+															/*    */table.getDouble(rowIndex1, outputFeatureStartColumnIndex[experimentIndex] + outputFeatureIndex) + //
+																	table.getDouble(rowIndex2, outputFeatureStartColumnIndex[experimentIndex] + outputFeatureIndex);
+														} else {
+															exampleInputs[exampleIndex] = //
+															/*    */table.getDouble(rowIndex1, inputFeatureStartColumnIndex + modelInputFeatureIndex) + //
+																	table.getDouble(rowIndex2, inputFeatureStartColumnIndex + modelInputFeatureIndex);
+														}
+													}
+												}
+
+												// create training example outputs //
+
+												for (int exampleIndex = 0; exampleIndex < numAllExamples; exampleIndex++) {
+
+													int rowIndex1 = timeSeriesMergedStartRowIndex1 + exampleIndex;
+													int rowIndex2 = timeSeriesMergedStartRowIndex2 + exampleIndex;
+
+													if (randomOutputs) {
+														exampleOutputs[exampleIndex] = randomOutputsRandom.nextGaussian();
+													} else {
+														exampleOutputs[exampleIndex] = //
+														/*    */table.getDouble(rowIndex1, outputFeatureStartColumnIndex[experimentIndex] + outputFeatureIndex) + //
+																table.getDouble(rowIndex2, outputFeatureStartColumnIndex[experimentIndex] + outputFeatureIndex);
+													}
+												}
+
+											} else {
+
+												// create training example inputs //
+
+												if (!useMeanModel) {
+													for (int exampleIndex = 0; exampleIndex < numAllExamples; exampleIndex++) {
+
+														int rowIndex = timeSeriesStartRowIndex + exampleIndex - lag;
+
+														if (randomInputs) {
+															exampleInputs[exampleIndex] = randomInputsRandom.nextGaussian();
+														} else if (useSelfModel) {
+															exampleInputs[exampleIndex] = //
+															table.getDouble(rowIndex, outputFeatureStartColumnIndex[experimentIndex] + outputFeatureIndex);
+														} else {
+															exampleInputs[exampleIndex] = //
+															table.getDouble(rowIndex, inputFeatureStartColumnIndex + modelInputFeatureIndex);
+														}
+													}
+												}
+
+												// create training example outputs //
+
+												for (int exampleIndex = 0; exampleIndex < numAllExamples; exampleIndex++) {
+
+													int rowIndex = timeSeriesStartRowIndex + exampleIndex;
+
+													if (randomOutputs) {
+														exampleOutputs[exampleIndex] = randomOutputsRandom.nextGaussian();
+													} else {
+														exampleOutputs[exampleIndex] = //
+														table.getDouble(rowIndex, outputFeatureStartColumnIndex[experimentIndex] + outputFeatureIndex);
+													}
+												}
+
+											}
+
+											// apply zScore Normalization
+
+											{
+												double valueSum = 0.0;
+
+												for (int exampleIndex = 0; exampleIndex < numAllExamples; exampleIndex++) {
+													valueSum += exampleInputs[exampleIndex];
+												}
+
+												double mean = valueSum / numAllExamples;
+
+												double varianceSum = 0.0;
+
+												for (int exampleIndex = 0; exampleIndex < numAllExamples; exampleIndex++) {
+													double diff = exampleInputs[exampleIndex] - mean;
+													varianceSum += diff * diff;
+												}
+
+												double std = Math.sqrt(varianceSum / numAllExamples);
+
+												for (int exampleIndex = 0; exampleIndex < numAllExamples; exampleIndex++) {
+
+													if (std != 0.0) {
+														exampleInputs[exampleIndex] = (exampleInputs[exampleIndex] - mean) / std;
+													} else {
+														exampleInputs[exampleIndex] = 0.0;
+													}
+												}
+											}
+											{
+												double valueSum = 0.0;
+
+												for (int exampleIndex = 0; exampleIndex < numAllExamples; exampleIndex++) {
+													valueSum += exampleOutputs[exampleIndex];
+												}
+
+												double mean = valueSum / numAllExamples;
+
+												double varianceSum = 0.0;
+
+												for (int exampleIndex = 0; exampleIndex < numAllExamples; exampleIndex++) {
+													double diff = exampleOutputs[exampleIndex] - mean;
+													varianceSum += diff * diff;
+												}
+
+												double std = Math.sqrt(varianceSum / numAllExamples);
+
+												for (int exampleIndex = 0; exampleIndex < numAllExamples; exampleIndex++) {
+													exampleOutputs[exampleIndex] = (exampleOutputs[exampleIndex] - mean) / std;
+												}
+											}
+
+											if (shuffleInputsIndependent) {
+												exampleInputs = Utility.randomizedDoubleArray(randomInputsRandom, exampleInputs, exampleInputs.length);
+											}
+											if (shuffleOutputsIndependent) {
+												exampleOutputs = Utility.randomizedDoubleArray(randomOutputsRandom, exampleOutputs, exampleOutputs.length);
+											}
+
+											/******************************************************************/
+											/** MEASURE PERFORMANCE OF INDUCTIVE BIAS USING CROSS VALIDATION **/
+											/******************************************************************/
+
+											// create and test models with leave one out cross validation //
+
+											if (enableCrossValidationAnalysis) {
+
+												double crossValidationErrorSum = 0.0;
+
+												prolemModelSlopeSignCounts[0] = 0;
+												prolemModelSlopeSignCounts[1] = 0;
+
+												// #################################################################################################################################################################################
+
+												for (int testExampleIndex = 0; testExampleIndex < numAllExamples; testExampleIndex++) {
+
+													// IO.p();
+													// IO.p("problemSpaceIndex      = " + problemSpaceIndex);
+													// IO.p("outputFeatureIndex     = " + problemIndex);
+													// IO.p("modelNumInputs         = " + modelNumInputs);
+													// IO.p("modelInputFeatureIndex = " + modelInputFeatureIndex);
+													// IO.p("numExamples            = " + numAllExamples);
+													// IO.p("testExampleIndex       = " + testExampleIndex);
+
+													// create training examples //
+
+													{
+														int trainExampleIndex = 0;
+														for (int exampleIndex = 0; exampleIndex < numAllExamples; exampleIndex++) {
+
+															if (exampleIndex == testExampleIndex) {
+																continue;
+															}
+
+															if (!useMeanModel) {
+																crossValidationTrainExampleInputs[trainExampleIndex][0] = exampleInputs[exampleIndex];
+															}
+															crossValidationTrainExampleOutputs[trainExampleIndex] = exampleOutputs[exampleIndex];
+
+															trainExampleIndex++;
+														}
+
+													}
+
+													// create testing examples //
+
+													{
+														if (!useMeanModel) {
+															crossValidationTestExampleInputs[0][0] = exampleInputs[testExampleIndex];
+														}
+														crossValidationTestExampleOutputs[0] = exampleOutputs[testExampleIndex];
+
+													}
+
+													// create model //
+
+													double meanModel = Double.NaN;
+													double[] linearModel = null;
+
+													double outputSum = 0.0;
+													for (int trainExampleIndex = 0; trainExampleIndex < numTrainingExamples; trainExampleIndex++) {
+														outputSum += crossValidationTrainExampleOutputs[trainExampleIndex];
+													}
+
+													double mean = outputSum / numTrainingExamples;
+
+													if (useMeanModel) {
+
+														meanModel = mean;
+
+													} else {
+
+														if (!useMeanModel) {
+
+															double slope = 0.0;
+
+															try {
+																linearModel = Utility.multipleRegression(crossValidationTrainExampleInputs, crossValidationTrainExampleOutputs);
+															} catch (Exception e) {
+																linearModel = new double[] { 0.0, mean };
+															}
+
+															slope = linearModel[0];
+// IO.p("slope = " + slope);
+
+// prolemSpaceModelSlopeSums[modelIndex] += slope; !!!
+// prolemSpaceModelSlopeCounts[modelIndex]++; !!!
+
+// prolemSpaceModelSlopeWeightedSums[modelIndex] += slope * outputSum;
+// prolemSpaceModelSlopeWeightSums[modelIndex] += outputSum;
+
+															if (slope < 0) {
+																prolemModelSlopeSignCounts[0]++;
+															}
+															if (slope > 0) {
+																prolemModelSlopeSignCounts[1]++;
+															}
+														}
+
+													}
+
+													// test model //
+
+													double difference = Double.NaN;
+
+													if (useMeanModel) {
+
+														difference = (meanModel) - crossValidationTestExampleOutputs[0];
+
+													}
+
+													else {
+
+														difference = (linearModel[0] * crossValidationTestExampleInputs[0][0] + linearModel[1]) - crossValidationTestExampleOutputs[0];
+
+													}
+
+													double error = Double.NaN;
+
+													if (errorTypeIndex == 0) {
+														error = Math.abs(difference);
+													}
+
+													if (errorTypeIndex == 1) {
+														error = difference * difference;
+													}
+
+													crossValidationErrorSum += error;
+
+												}
+
+												modelErrorRates[modelIndex] = crossValidationErrorSum / numAllExamples;
+
+												prolemSpaceModelErrorRateSums[modelIndex] += modelErrorRates[modelIndex];
+
+												if (false) {
+													if (!randomizedDataBaselineDeterminationMode) {
+														if (reportTaxaResponseToDriverVariables) {
+															if (modelIndex > 0) {
+																IO.p("TaxaResponse" + "\t" + experimentNames[experimentIndex] + "\t" + problemName + "\t" + problemClassNames[outputFeatureIndex] + "\t" + modelInputFeatureNames[experimentIndex][modelIndex]
+																		+ "\t" + prolemModelSlopeSignCounts[0] + "\t" + prolemModelSlopeSignCounts[1] + "\t"
+																		+ (float) (prolemModelSlopeSignCounts[1] / (prolemModelSlopeSignCounts[0] + prolemModelSlopeSignCounts[1])));
+															}
+														}
+													}
+												}
+
+											}
+
+											/********************************************************/
+											/* do slope analysis on models formed with all examples */
+											/********************************************************/
+
+											if (!useMeanModel /* && !useSelfModel */) {
+
+												double[][] allTrainExampleInputs = new double[numAllExamples][1];
+												double[] allTrainExampleOutputs = new double[numAllExamples];
+
+												for (int exampleIndex = 0; exampleIndex < numAllExamples; exampleIndex++) {
+
+													allTrainExampleInputs[exampleIndex][0] = exampleInputs[exampleIndex];
+													allTrainExampleOutputs[exampleIndex] = exampleOutputs[exampleIndex];
+
+												}
+
+												double outputSum = 0.0;
+												for (int exampleIndex = 0; exampleIndex < numAllExamples; exampleIndex++) {
+													outputSum += allTrainExampleOutputs[exampleIndex];
+												}
+
+												double mean = outputSum / numTrainingExamples;
+
+												double[] linearModel = null;
+
+												try {
+													linearModel = Utility.multipleRegression(allTrainExampleInputs, allTrainExampleOutputs);
+												} catch (Exception e) {
+													linearModel = new double[] { 0.0, mean };
+												}
+
+												double slope = linearModel[0];
+
+												if (!randomizedDataBaselineDeterminationMode) {
+													if (reportTaxaResponseToDriverVariables) {
+														if (modelIndex > 0) {
+															IO.p("TaxaResponse" + "\t" + experimentNames[experimentIndex] + "\t" + problemName + "\t" + problemClassNames[outputFeatureIndex] + "\t"
+																	+ //
+																	modelInputFeatureNames[experimentIndex][modelIndex] + "\t"
+																	+ //
+																	prolemModelSlopeSignCounts[0] + "\t" + prolemModelSlopeSignCounts[1] + "\t" + (float) (prolemModelSlopeSignCounts[1] / (prolemModelSlopeSignCounts[0] + prolemModelSlopeSignCounts[1]))
+																	+ "\t" + slope);
+														}
+													}
+												}
+
+												prolemSpaceModelSlopes[modelIndex][outputFeatureIndex] = slope;
+// prolemSpaceModelSlopeCounts[modelIndex]++;
+
+												if (false /* modelInputFeatureNames[experimentIndex][modelIndex].equals("Self-Lag1") */) {
+													for (int exampleIndex = 0; exampleIndex < numAllExamples; exampleIndex++) {
+
+														IO.p(modelInputFeatureNames[experimentIndex][modelIndex] + "\t" + allTrainExampleInputs[exampleIndex][0] + "\t" + allTrainExampleOutputs[exampleIndex]);
+													}
+													IO.p(modelInputFeatureNames[experimentIndex][modelIndex] + "\t" + linearModel[0] + "\t" + linearModel[1]);
+												}
+
+												double offsetSlope = linearModel[0] + modelSlopeOffsets[experimentIndex][modelIndex];
+
+												if (offsetSlope < 0.0) {
+													prolemSpaceModelSlopeSignCounts[modelIndex][0]++;
+												} else if (offsetSlope > 0.0) {
+													prolemSpaceModelSlopeSignCounts[modelIndex][1]++;
+												}
+
+											}
+
+										}
+
+										// int[] ditherBestModelIndexDistribution = new int[numModels];
+
+										for (int i = 0; i < numBestModelEvaluationTrials; i++) {
+
+											double bestModelErrorRate = Double.POSITIVE_INFINITY;
+											int bestModelIndex = -1;
+
+											for (int modelIndex = 0; modelIndex < numModels[experimentIndex]; modelIndex++) {
+												if (modelErrorRates[modelIndex] < bestModelErrorRate) {
+													bestModelErrorRate = modelErrorRates[modelIndex] + ((ditherRandom.nextDouble() - 0.5) * ditherRange);
+													bestModelIndex = modelIndex;
+												}
+											}
+
+											bestModelIndexCounts[bestModelIndex]++;
+
+										}
+
+										numPredictionProblemsSolved++;
+
+										// int bestModelCount = Integer.MIN_VALUE;
+										// int bestModelIndex = -1;
+										// for (int modelIndex = 0; modelIndex < numModels; modelIndex++) {
+										// if (ditherBestModelIndexDistribution[modelIndex] > bestModelCount) {
+										// bestModelCount = ditherBestModelIndexDistribution[modelIndex];
+										// bestModelIndex = modelIndex;
+										// }
+										// }
+										//
+										// bestModelIndexCounts[bestModelIndex]++;
+
+									}
+								}
+
+								if (enableCrossValidationAnalysis) {
+
+									for (int modelIndex = 0; modelIndex < numModels[experimentIndex]; modelIndex++) {
+										prolemSpaceModelErrorRates[modelIndex] = prolemSpaceModelErrorRateSums[modelIndex] / numPredictionProblemsSolved;
+									}
+
+									if (!randomizedDataBaselineDeterminationMode) {
+										IO.p("Mode Best Predictor Counts:");
+
+										IO.p("experimentName" + "\t" + "errorType" + "\t" + "subSet" + "\t" + "driverVar" + "\t" + "count");
+										for (int modelIndex = 0; modelIndex < numModels[experimentIndex]; modelIndex++) {
+											IO.p(experimentNames[experimentIndex] + "\t" + errorTypeStrings[errorTypeIndex] + "\t" + dataSubsetFilter[experimentIndex] + "\t" + modelInputFeatureNames[experimentIndex][modelIndex] + "\t"
+													+ (float) ((double) bestModelIndexCounts[modelIndex] / numBestModelEvaluationTrials));
+										}
+
+										IO.p();
+
+										IO.p("Model Error Rates and Relatative (to mean) Error:");
+										IO.p("experimentName" + "\t" + "errorType" + "\t" + "subSet" + "\t" + "driverVar" + "\t" + "errorRate" + "\t" + "difference");
+										for (int modelIndex = 0; modelIndex < numModels[experimentIndex]; modelIndex++) {
+											IO.p(experimentNames[experimentIndex] + "\t" + errorTypeStrings[errorTypeIndex] + "\t" + dataSubsetFilter[experimentIndex] + "\t" + modelInputFeatureNames[experimentIndex][modelIndex] + "\t"
+													+ (float) (prolemSpaceModelErrorRates[modelIndex]) + "\t" + (float) (prolemSpaceModelErrorRates[modelIndex] - prolemSpaceModelErrorRates[0]));
+										}
+
+									}
+
+// IO.p("modelSlopeWeighted:");
+// for (int modelIndex = 0; modelIndex < numModels[experimentIndex]; modelIndex++) {
+// if (modelUseMeanModel[experimentIndex][modelIndex]) {
+// continue;
+// }
+// IO.p(experimentNames[experimentIndex] + "\t" + errorTypeStrings[errorTypeIndex] + "\t" + problemsSpaceNames[experimentIndex][problemSpaceIndex] + "\t" + modelInputFeatureNames[experimentIndex][modelIndex] + "\t"
+// + (float) (prolemSpaceModelSlopeWeightedSums[modelIndex] / prolemSpaceModelSlopeWeightSums[modelIndex]));
+// }
+
+								}
+
+								if (errorTypeIndex == numErrortypes - 1) {
+
+									if (!randomizedDataBaselineDeterminationMode) {
+
+										IO.p();
+										IO.p();
+										IO.p("All N Example Model Slope Analysis");
+										IO.p();
+
+										IO.p();
+
+										IO.p("Model Average Slope:");
+
+										IO.p("experimentName" + "\t" + "subSet" + "\t" + "n" + "\t" + "driverVar" + "\t" + "mean" + "\t" + "p" + "\t" + "p est." + "\t" + "significant?");
+									}
+
+									for (int modelIndex = 0; modelIndex < numModels[experimentIndex]; modelIndex++) {
+										if (modelUseMeanModel[experimentIndex][modelIndex]) {
+											continue;
+										}
+
+										double sum = 0;
+										for (int predictedOutputFeatureIndex = 0; predictedOutputFeatureIndex < numPredictedOutputs; predictedOutputFeatureIndex++) {
+											sum += prolemSpaceModelSlopes[modelIndex][predictedOutputIndices[predictedOutputFeatureIndex]];
+										}
+										double mean = sum / numPredictedOutputs;
+
+										double varianceSum = 0;
+										for (int predictedOutputFeatureIndex = 0; predictedOutputFeatureIndex < numPredictedOutputs; predictedOutputFeatureIndex++) {
+											double diff = prolemSpaceModelSlopes[modelIndex][predictedOutputIndices[predictedOutputFeatureIndex]] - mean;
+											varianceSum += diff * diff;
+										}
+										double std = varianceSum / numPredictedOutputs;
+										double stde = std / Math.sqrt(numPredictedOutputs);
+										double z = Math.abs(mean / stde);
+										double p = (1.0 - Utility.gaussianPhiIntegral(z)) * numTails;
+
+										if (randomizedDataBaselineDeterminationMode) {
+											zScores[numZScores++] = z;
+										}
+
+										double adjustedFalseNegativeProbability = Double.NaN;
+										if (!randomizedDataBaselineDeterminationMode) {
+											int index = Arrays.binarySearch(zScores, 0, numZScores, z);
+											if (index < 0) 
+												index = -(index + 1);
+											adjustedFalseNegativeProbability = 1.0 - (double) Math.abs(index) / numZScores;
+// if (p > adjustedFalseNegativeProbability) {
+// adjustedFalseNegativeProbability = p;
+// }
+										}
+
+										String flagString = "";
+										if (adjustedFalseNegativeProbability <= pThreshold) {
+											flagString = "!!!";
+										}
+
+										if (!randomizedDataBaselineDeterminationMode) {
+											
+											if (adjustedFalseNegativeProbability < 0) {
+												throw new Exception();
+											}
+											IO.p(experimentNames[experimentIndex] + "\t" + dataSubsetFilter[experimentIndex] + "\t" + numPredictedOutputs + "\t" + modelInputFeatureNames[experimentIndex][modelIndex] // /
+													+ "\t" + (float) mean + "\t" + (float) p + "\t" + (float) adjustedFalseNegativeProbability + "\t" + flagString);
+										}
+
+									}
+
+									if (!randomizedDataBaselineDeterminationMode) {
+										IO.p();
+										IO.p("prolemSpaceModelSlopeSignCounts:");
+										IO.p("experimentName" + "\t" + "subSet" + "\t" + "n" + "\t" + "driverVar" + "\t" + "-Slope" + "\t" + "+Slope" + "\t" + "diff" + "\t" + "p" + "\t" + "p est." + "\t" + "significant?");
+									}
+
+									for (int modelIndex = 0; modelIndex < numModels[experimentIndex]; modelIndex++) {
+
+										if (modelUseMeanModel[experimentIndex][modelIndex] /* || modelUseSelfModel[experimentIndex][modelIndex] */) {
+											continue;
+										}
+
+										int negSlopeCount = prolemSpaceModelSlopeSignCounts[modelIndex][0];
+										int posSlopeCount = prolemSpaceModelSlopeSignCounts[modelIndex][1];
+										int countDiff = posSlopeCount - negSlopeCount;
+										int mag = Math.abs(countDiff);
+
+//										double p = 0.5;
+										int n = negSlopeCount + posSlopeCount;
+										int k = Math.min(negSlopeCount, posSlopeCount);
+
+										BigInteger totalNumConfigurations = BigInteger.ZERO;
+										BigInteger totalNumConfigurationsWithKOrLess = BigInteger.ZERO;
+
+										for (int sizeN = 0; sizeN <= n; sizeN++) {
+											
+											BigInteger combinationCountForSizeN = binomial(n, sizeN);
+											
+											totalNumConfigurations = totalNumConfigurations.add(combinationCountForSizeN);
+
+											if (sizeN <= k) {
+												totalNumConfigurationsWithKOrLess = totalNumConfigurationsWithKOrLess.add(combinationCountForSizeN);
+											}
+										}
+
+										double totalNumConfigurationsDouble = totalNumConfigurations.doubleValue();
+										double totalNumConfigurationsWithKOrLessDouble = totalNumConfigurationsWithKOrLess.doubleValue();
+
+										double falseNegativeProbability = totalNumConfigurationsWithKOrLessDouble / totalNumConfigurationsDouble * numTails;
+										
+										if (falseNegativeProbability > 1.0) {
+											falseNegativeProbability = 1.0;
+//											throw new Exception();
+										}
+
+										// IO.p("totalNumConfigurationsDouble            = " + totalNumConfigurationsDouble);
+										// IO.p("totalNumConfigurationsWithKOrLessDouble = " + totalNumConfigurationsWithKOrLessDouble);
+										// IO.p("positiveHypothesisByChanceProbability   = " + positiveHypothesisByChanceProbability);
+										// IO.p();
+
+										// S.e();
+
+										// BigInteger x = binomial(150, 76);
+										//
+										// IO.p(x.toString());
+										// S.e();
+
+										numModelsTested++;
+
+										if (randomizedDataBaselineDeterminationMode) {
+											pScores[numPScores++] = falseNegativeProbability;
+										}
+
+										double adjustedFalseNegativeProbability = Double.NaN;
+										if (!randomizedDataBaselineDeterminationMode) {
+											int index = Arrays.binarySearch(pScores, 0, numPScores, falseNegativeProbability);
+											
+											if (index < 0) 
+												index = -(index + 1);
+											
+											adjustedFalseNegativeProbability = (double) Math.abs(index) / numPScores;
+// if (adjustedFalseNegativeProbability < falseNegativeProbability) {
+// adjustedFalseNegativeProbability = falseNegativeProbability;
+// }
+										}
+
+										String flagString = "";
+										if (adjustedFalseNegativeProbability <= pThreshold) {
+											flagString = "!!!";
+										}
+
+										if (!randomizedDataBaselineDeterminationMode) {
+											IO.p(experimentNames[experimentIndex] + "\t" + dataSubsetFilter[experimentIndex] + "\t" + numPredictedOutputs + "\t" + //
+													modelInputFeatureNames[experimentIndex][modelIndex] + "\t" + //
+													"-" + negSlopeCount + //
+													"\t" + "+" + posSlopeCount + //
+													"\t" + countDiff + //
+													"\t" + (float) falseNegativeProbability + "\t" + (float) adjustedFalseNegativeProbability + "\t" + flagString //
+											);
+										}
+									}
+
+								}
+
+							}
+
+						}
+
+					}
+
+					if (false) {
+
+						IO.p();
+						IO.p();
+						IO.p();
+						IO.p("signficance testing");
+
+						IO.p();
+						IO.p();
+						IO.p("zScoreCounts");
+						IO.p("z" + "\t" + "Count");
+						{
+							double sum = 0.0;
+							for (int i = 0; i < zScores.length; i++) {
+								sum += zScores[i];
+							}
+							double cumulativeSum = 0.0;
+							for (int i = 0; i < zScores.length; i++) {
+								cumulativeSum += zScores[i];
+								if (zScores[i] > 0) {
+									IO.p(i + "\t" + zScores[i] + "\t" + (1.0 - cumulativeSum / sum));
+								}
+							}
+						}
+						IO.p();
+						IO.p();
+						IO.p("pScoreCounts");
+						IO.p("-log10(p)" + "\t" + "Count");
+						{
+							double sum = 0.0;
+							for (int i = 0; i < pScores.length; i++) {
+								sum += pScores[i];
+							}
+							double cumulativeSum = 0.0;
+							for (int i = 0; i < pScores.length; i++) {
+								cumulativeSum += pScores[i];
+								if (pScores[i] > 0) {
+									IO.p((float) i / 10 + "\t" + pScores[i] + "\t" + (1.0 - cumulativeSum / sum));
+								}
+							}
+						}
+
+					}
+
+					if (randomizedDataBaselineDeterminationMode) {
+						Arrays.sort(zScores, 0, numZScores);
+						Arrays.sort(pScores, 0, numPScores);
+					}
+
+				}
+
+			}
+
+		}
+	}
+
+	static BigInteger binomial(final int N, final int K) {
+		BigInteger ret = BigInteger.ONE;
+		for (int k = 0; k < K; k++) {
+			ret = ret.multiply(BigInteger.valueOf(N - k)).divide(BigInteger.valueOf(k + 1));
+		}
+		return ret;
+	}
+
+}
+
+// signficance testing
+//
+// p value count expected
+// 0.1 12.832 18.6
+// 0.01 1.279 1.86
+// 0.001 0.145 0.18600002
+// 1.0E-4 0.007 0.0186
+// 1.0E-5 0.001 0.0018599998
+// 1.0E-6 0.0 1.86E-4
+// 1.0E-7 0.0 1.86E-5
+
+// zScoreCounts
+// 0 41719
+// 1 37884
+// 2 32083
+// 3 24798
+// 4 17815
+// 5 12279
+// 6 8014
+// 7 4799
+// 8 2909
+// 9 1702
+// 10 900
+// 11 531
+// 12 273
+// 13 149
+// 14 76
+// 15 34
+// 16 21
+// 17 8
+// 18 3
+// 19 2
+// 20 0
+// 21 0
+// 22 0
+// 23 0
+// 24 0
+// 25 1
+
+// shuffle
+// 0 14568 0.21677419354838712
+// 1 2318 0.09215053763440861
+// 2 825 0.047795698924731234
+// 3 427 0.0248387096774193
+// 4 245 0.011666666666666714
+// 5 129 0.004731182795698952
+// 6 51 0.001989247311827924
+// 7 19 9.67741935483879E-4
+// 8 14 2.1505376344088667E-4
+// 9 2 1.0752688172044333E-4
+// 10 1 5.3763440860166156E-5
+// 11 0 5.3763440860166156E-5
+// 12 1 0.0
+
+
+
